@@ -6,6 +6,9 @@ Bifrost fills the gap between heavy GUI clients and limited CLI tools. It brings
 
 ---
 
+<img width="2560" height="1439" alt="Screenshot 2026-01-07 at 4 48 17 AM" src="https://github.com/user-attachments/assets/7429db5e-c01a-47bf-ac97-e8f2fbdf6244" />
+
+
 ## ✨ Features
 
 - **🚀 Instant Startup**: Lazy-loads chats for immediate access, handling hundreds of conversations without breaking a sweat.
