@@ -22,9 +22,20 @@ Vimgram fills the gap between heavy GUI clients and limited CLI tools. It brings
 
 ---
 
-## 🛠 Installation & Setup
+## 🛠 Installation
 
-### Prerequisites
+### Option 1: Install via Cargo (Recommended)
+If you have Rust installed, just run:
+```bash
+cargo install vimgram
+```
+Then run it:
+```bash
+vimgram
+```
+
+### Option 2: Build from Source
+**Prerequisites**
 - **Rust** (latest stable)
 - A Telegram **API ID** and **API Hash** (get them from [my.telegram.org](https://my.telegram.org))
 
