@@ -5,7 +5,7 @@ use directories::ProjectDirs;
 use std::fs;
 
 fn get_session_path() -> PathBuf {
-    if let Some(proj_dirs) = ProjectDirs::from("", "", "bifrost") {
+    if let Some(proj_dirs) = ProjectDirs::from("", "", "vimgram") {
         let config_dir = proj_dirs.config_dir();
         // Ensure directory exists
         if !config_dir.exists() {

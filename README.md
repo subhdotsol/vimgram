@@ -1,19 +1,18 @@
-# 🌈 Bifrost
+# ⚡️ Vimgram
 
 **A blazing fast, Vim-native Telegram client for your terminal.**
 
-Bifrost fills the gap between heavy GUI clients and limited CLI tools. It brings the full power of Telegram DMs, groups, and channels into your terminal with a focus on **speed** and **keyboard-driven efficiency**.
+Vimgram fills the gap between heavy GUI clients and limited CLI tools. It brings the full power of Telegram DMs, groups, and channels into your terminal with a focus on **speed** and **keyboard-driven efficiency**.
 
 ---
 
-<img width="2560" height="1439" alt="Screenshot 2026-01-07 at 4 48 17 AM" src="https://github.com/user-attachments/assets/7429db5e-c01a-47bf-ac97-e8f2fbdf6244" />
-
+<img width="2560" height="1439" alt="Vimgram Screenshot" src="https://github.com/user-attachments/assets/7429db5e-c01a-47bf-ac97-e8f2fbdf6244" />
 
 ## ✨ Features
 
 - **🚀 Instant Startup**: Lazy-loads chats for immediate access, handling hundreds of conversations without breaking a sweat.
 - **⚡️ Real-time**: Messages stream in effectively instantly. No manual refreshing needed.
-- **⌨️ Vim-Native**: Navigate entirely with `hjkl`. If you know Vim, you already know Bifrost.
+- **⌨️ Vim-Native**: Navigate entirely with `hjkl`. If you know Vim, you already know Vimgram.
 - **📜 Smart Scrolling**:
   - Auto-scrolls to the newest message.
   - "Stick-to-bottom" behavior while reading live chats.
@@ -31,8 +30,8 @@ Bifrost fills the gap between heavy GUI clients and limited CLI tools. It brings
 
 ### 1. Clone & Config
 ```bash
-git clone https://github.com/yourusername/bifrost.git
-cd bifrost
+git clone https://github.com/subhdotsol/vimgram.git
+cd vimgram
 
 # Create .env file
 echo "TELEGRAM_API_ID=123456" >> .env
@@ -49,7 +48,7 @@ cargo run --release
 
 ## 🎮 Keybindings
 
-Bifrost is modal, just like Vim.
+Vimgram is modal, just like Vim.
 
 ### **NORMAL Mode** (Default)
 | Key | Action |
@@ -57,7 +56,7 @@ Bifrost is modal, just like Vim.
 | `j` / `k` | Scroll history **down** (newer) / **up** (older) |
 | `h` / `l` | Switch focus between **Friends List** and **Chat** |
 | `i` | Enter **INSERT** mode (start typing) |
-| `q` | Quit Bifrost |
+| `q` | Quit Vimgram |
 
 ### **INSERT Mode**
 | Key | Action |
@@ -70,7 +69,7 @@ Bifrost is modal, just like Vim.
 
 ## 🏗 Architecture
 
-Bifrost is built on a robust Rust stack:
+Vimgram is built on a robust Rust stack:
 - **[Grammers](https://github.com/Lonami/grammers)**: Pure Rust MTProto client implementation.
 - **[Ratatui](https://github.com/ratatui-org/ratatui)**: Advanced terminal UI rendering.
 - **[Tokio](https://tokio.rs)**: Async runtime for handling concurrent updates and input.

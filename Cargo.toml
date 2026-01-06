@@ -1,8 +1,8 @@
 [package]
-name = "bifrost-tui"
+name = "vimgram"
 version = "0.1.0"
 edition = "2021"
-authors = ["Subh <your@email.com>"]
+authors = ["Subh <subhajitchaudhury05@gmail.com>"]
 description = "A blazing fast, Vim-native Telegram client for the terminal. Built with Rust, Ratatui, and Grammers."
 license = "MIT"
 repository = "https://github.com/subhdotsol/bifrost"
