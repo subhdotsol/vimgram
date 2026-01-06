@@ -231,11 +231,27 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
         " chats ".to_string()
     };
 
-    // Apply scroll offset - skip items based on scroll position
+    // Apply scroll offset - bottom aligned
     let visible_height = area.height.saturating_sub(2) as usize;
-    let scroll = app.scroll_offset.min(items.len().saturating_sub(1));
-    let end = (scroll + visible_height).min(items.len());
-    let visible_items: Vec<ListItem> = items.into_iter().skip(scroll).take(end - scroll).collect();
+    let total_items = items.len();
+    
+    // Calculate range based on inverted scroll_offset (0 = bottom)
+    let end_index = total_items.saturating_sub(app.scroll_offset);
+    let start_index = end_index.saturating_sub(visible_height);
+    
+    // Get the slice of messages
+    let mut visible_items: Vec<ListItem> = items.into_iter()
+        .skip(start_index)
+        .take(end_index - start_index)
+        .collect();
+        
+    // If fewer items than height, pad with empty lines to force bottom alignment
+    if visible_items.len() < visible_height {
+        let padding = visible_height - visible_items.len();
+        let mut padded_items = vec![ListItem::new(""); padding];
+        padded_items.extend(visible_items);
+        visible_items = padded_items;
+    }
 
     let list = List::new(visible_items).block(
         Block::default()

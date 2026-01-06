@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect and authenticate
     println!("🔌 Connecting to Telegram...");
     let tg = TelegramClient::connect(api_id, &api_hash).await?;
-    
+
     if !tg.is_authorized().await? {
         authenticate(&tg.client).await?;
         tg.save_session()?;
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let me = tg.client.get_me().await?;
     println!("✅ Logged in as @{}", me.username().unwrap_or("unknown"));
-    println!("🚀 Starting TUI...");
+    println!("🚀 Starting Bifrost...");
 
     // Setup terminal
     enable_raw_mode()?;
@@ -73,7 +73,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Add welcome chat
     app.add_chat(1, "Welcome".to_string());
-    app.add_message(1, "Bifrost".to_string(), "Welcome to Bifrost! Use hjkl to navigate, i to type, Enter to send.".to_string(), false);
+    app.add_message(
+        1,
+        "Bifrost".to_string(),
+        "Welcome to Bifrost! Use hjkl to navigate, i to type, Enter to send.".to_string(),
+        false,
+    );
 
     // Load dialogs (just chat names, no messages for faster loading)
     // Limit to 100 chats to prevent overload
@@ -81,12 +86,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut count = 0;
     const MAX_CHATS: usize = 100;
     while let Some(dialog) = dialogs.next().await? {
-        if count >= MAX_CHATS { break; }
+        if count >= MAX_CHATS {
+            break;
+        }
         let chat = dialog.chat();
         app.add_chat(chat.id(), chat.name().to_string());
         count += 1;
     }
-    
+
     app.loading_status = None;
     // Let lazy loading handle message fetching for the first chat too
     app.needs_message_load = true;
@@ -109,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if !app.messages.contains_key(&chat_id) && chat_id != 1 {
                     app.loading_status = Some("Loading messages...".to_string());
                     terminal.draw(|f| draw(f, &app))?; // Show loading status
-                    
+
                     // Find the dialog for this chat
                     let mut dialogs = tg.client.iter_dialogs();
                     while let Some(dialog) = dialogs.next().await? {
@@ -117,21 +124,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let mut messages_iter = tg.client.iter_messages(dialog.chat());
                             let mut fetched = 0;
                             while let Some(msg) = messages_iter.next().await? {
-                                if fetched >= 50 { break; }
+                                if fetched >= 50 {
+                                    break;
+                                }
                                 let sender = if msg.outgoing() {
                                     "You".to_string()
                                 } else {
                                     msg.sender()
                                         .map(|s| {
                                             let name = s.name().to_string();
-                                            if name.is_empty() { dialog.chat().name().to_string() } else { name }
+                                            if name.is_empty() {
+                                                dialog.chat().name().to_string()
+                                            } else {
+                                                name
+                                            }
                                         })
                                         .unwrap_or_else(|| dialog.chat().name().to_string())
                                 };
-                                app.add_message(chat_id, sender, msg.text().to_string(), msg.outgoing());
+                                app.add_message(
+                                    chat_id,
+                                    sender,
+                                    msg.text().to_string(),
+                                    msg.outgoing(),
+                                );
                                 fetched += 1;
                             }
-                            
+
                             // Reverse messages to show oldest first
                             if let Some(msgs) = app.messages.get_mut(&chat_id) {
                                 msgs.reverse();
@@ -154,26 +172,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if dialog.chat().id() == chat_id {
                         // Clear existing messages for this chat
                         app.messages.remove(&chat_id);
-                        
+
                         // Fetch last 20 messages
                         let mut messages_iter = tg.client.iter_messages(dialog.chat());
                         let mut fetched = 0;
                         while let Some(msg) = messages_iter.next().await? {
-                            if fetched >= 50 { break; }
+                            if fetched >= 50 {
+                                break;
+                            }
                             let sender = if msg.outgoing() {
                                 "You".to_string()
                             } else {
                                 msg.sender()
                                     .map(|s| {
                                         let name = s.name().to_string();
-                                        if name.is_empty() { dialog.chat().name().to_string() } else { name }
+                                        if name.is_empty() {
+                                            dialog.chat().name().to_string()
+                                        } else {
+                                            name
+                                        }
                                     })
                                     .unwrap_or_else(|| dialog.chat().name().to_string())
                             };
-                            app.add_message(chat_id, sender, msg.text().to_string(), msg.outgoing());
+                            app.add_message(
+                                chat_id,
+                                sender,
+                                msg.text().to_string(),
+                                msg.outgoing(),
+                            );
                             fetched += 1;
                         }
-                        
+
                         // Reverse messages to show oldest first
                         if let Some(msgs) = app.messages.get_mut(&chat_id) {
                             msgs.reverse();
@@ -195,8 +224,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let mut dialogs = tg.client.iter_dialogs();
                             while let Some(dialog) = dialogs.next().await? {
                                 if dialog.chat().id() == chat_id {
-                                    tg.client.send_message(dialog.chat(), message_to_send.clone()).await?;
-                                    app.add_message(chat_id, "You".to_string(), message_to_send, true);
+                                    tg.client
+                                        .send_message(dialog.chat(), message_to_send.clone())
+                                        .await?;
+                                    app.add_message(
+                                        chat_id,
+                                        "You".to_string(),
+                                        message_to_send,
+                                        true,
+                                    );
                                     break;
                                 }
                             }
@@ -230,10 +266,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Restore terminal
     disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen
-    )?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
     println!("👋 Goodbye!");

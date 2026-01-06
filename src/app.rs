@@ -98,10 +98,8 @@ impl App {
                 }
             }
             Panel::Chats => {
-                // Scroll up in the chat
-                if self.scroll_offset > 0 {
-                    self.scroll_offset -= 1;
-                }
+                // Scroll up (back in history)
+                self.scroll_offset = self.scroll_offset.saturating_add(1);
             }
         }
     }
@@ -118,8 +116,8 @@ impl App {
                 }
             }
             Panel::Chats => {
-                // Scroll down in the chat
-                self.scroll_offset += 1;
+                // Scroll down (forward in history)
+                self.scroll_offset = self.scroll_offset.saturating_sub(1);
             }
         }
     }
