@@ -194,7 +194,10 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
             items.push(ListItem::new(Line::from("")));
         } else {
             // Incoming: sender name then message
-            let sender_display: String = msg.sender.chars().take(12).collect();
+            let mut sender_display: String = msg.sender.chars().take(20).collect();
+            if sender_display.trim().is_empty() {
+                sender_display = "Unknown".to_string();
+            }
             
             let sender_style = Style::default()
                 .fg(Color::Rgb(100, 180, 255))
@@ -204,7 +207,8 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
             // First line: sender + text
             if let Some(first_line) = wrapped_lines.first() {
                 items.push(ListItem::new(Line::from(vec![
-                    Span::styled(format!(" {}: ", sender_display), sender_style),
+                    Span::styled(format!(" {}", sender_display), sender_style),
+                    Span::raw(": "), // Separate colon, not styled
                     Span::styled(first_line.clone(), text_style),
                 ])));
             }

@@ -133,13 +133,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     msg.sender()
                                         .map(|s| {
                                             let name = s.name().to_string();
-                                            if name.is_empty() {
-                                                dialog.chat().name().to_string()
+                                            if name.trim().is_empty() {
+                                                let cname = dialog.chat().name().to_string();
+                                                if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
                                             } else {
                                                 name
                                             }
                                         })
-                                        .unwrap_or_else(|| dialog.chat().name().to_string())
+                                        .unwrap_or_else(|| {
+                                            let cname = dialog.chat().name().to_string();
+                                            if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
+                                        })
                                 };
                                 app.add_message(
                                     chat_id,
@@ -252,9 +256,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let sender = msg.sender()
                             .map(|s| {
                                 let name = s.name().to_string();
-                                if name.is_empty() { chat.name().to_string() } else { name }
+                                if name.trim().is_empty() { 
+                                    let cname = chat.name().to_string();
+                                    if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
+                                } else { name }
                             })
-                            .unwrap_or_else(|| chat.name().to_string());
+                            .unwrap_or_else(|| {
+                                let cname = chat.name().to_string();
+                                if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
+                            });
                         app.add_chat(chat.id(), chat.name().to_string());
                         app.add_message(chat.id(), sender, msg.text().to_string(), false);
                     }
