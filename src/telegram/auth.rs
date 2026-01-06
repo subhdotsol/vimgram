@@ -42,21 +42,31 @@ pub fn prompt_for_credentials() -> (i32, String) {
     println!("Get these from https://my.telegram.org");
     println!("──────────────────────────────────────");
 
-    print!("API_ID: ");
-    io::stdout().flush().unwrap();
-    let api_id: i32 = io::stdin()
-        .lock()
-        .lines()
-        .next()
-        .unwrap()
-        .unwrap()
-        .trim()
-        .parse()
-        .expect("API_ID must be a number");
+    let mut stdin = io::stdin();
+    let mut stdout = io::stdout();
 
-    print!("API_HASH: ");
-    io::stdout().flush().unwrap();
-    let api_hash = io::stdin().lock().lines().next().unwrap().unwrap();
+    let api_id: i32 = loop {
+        print!("API_ID: ");
+        stdout.flush().unwrap();
+        let mut input = String::new();
+        stdin.read_line(&mut input).expect("Failed to read line");
+        match input.trim().parse() {
+            Ok(num) => break num,
+            Err(_) => println!("❌ Invalid API_ID. Please enter a valid number."),
+        }
+    };
+
+    let api_hash = loop {
+        print!("API_HASH: ");
+        stdout.flush().unwrap();
+        let mut input = String::new();
+        stdin.read_line(&mut input).expect("Failed to read line");
+        let hash = input.trim().to_string();
+        if !hash.is_empty() {
+            break hash;
+        }
+        println!("❌ API_HASH cannot be empty.");
+    };
 
     (api_id, api_hash)
 }
