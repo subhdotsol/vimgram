@@ -222,8 +222,10 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    // Get selected chat name for title
-    let title = if let Some(chat) = app.chats.get(app.selected_chat) {
+    // Get selected chat name for title (include loading status if present)
+    let title = if let Some(status) = &app.loading_status {
+        format!(" {} ", status)
+    } else if let Some(chat) = app.chats.get(app.selected_chat) {
         format!(" {} ", chat.name)
     } else {
         " chats ".to_string()

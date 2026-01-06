@@ -69,21 +69,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create app state
     let mut app = App::new();
+    app.loading_status = Some("Loading chats...".to_string());
 
-    // Add some demo chats (we'll load real ones later)
+    // Add welcome chat
     app.add_chat(1, "Welcome".to_string());
     app.add_message(1, "Bifrost".to_string(), "Welcome to Bifrost! Use hjkl to navigate, i to type, Enter to send.".to_string(), false);
 
-    // Load recent dialogs with message history
+    // Load ALL dialogs (just chat names, no messages for faster loading)
     let mut dialogs = tg.client.iter_dialogs();
+    let mut dialog_list: Vec<grammers_client::types::Dialog> = Vec::new();
     let mut count = 0;
     while let Some(dialog) = dialogs.next().await? {
-        if count >= 20 { break; } // Limit to 20 chats
         let chat = dialog.chat();
+        app.add_chat(chat.id(), chat.name().to_string());
+        dialog_list.push(dialog);
+        count += 1;
+        // Update status every 10 chats
+        if count % 10 == 0 {
+            app.loading_status = Some(format!("Loaded {} chats...", count));
+        }
+    }
+    
+    app.loading_status = Some(format!("Loaded {} chats!", count));
+    
+    // Only fetch messages for the first (selected) chat to start quickly
+    if let Some(first_dialog) = dialog_list.first() {
+        let chat = first_dialog.chat();
         let chat_id = chat.id();
-        app.add_chat(chat_id, chat.name().to_string());
-        
-        // Fetch last 50 messages for each chat
         let mut messages_iter = tg.client.iter_messages(chat.clone());
         let mut fetched = 0;
         while let Some(msg) = messages_iter.next().await? {
@@ -106,9 +118,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(msgs) = app.messages.get_mut(&chat_id) {
             msgs.reverse();
         }
-        
-        count += 1;
     }
+    
+    app.loading_status = None;
+    app.needs_message_load = false;
 
     // Main loop
     loop {
@@ -118,6 +131,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Check for quit
         if app.should_quit {
             break;
+        }
+
+        // Lazy-load messages for currently selected chat if needed
+        if app.needs_message_load {
+            app.needs_message_load = false;
+            if let Some(chat_id) = app.current_chat_id() {
+                // Only load if we don't have messages for this chat yet
+                if !app.messages.contains_key(&chat_id) && chat_id != 1 {
+                    app.loading_status = Some("Loading messages...".to_string());
+                    terminal.draw(|f| draw(f, &app))?; // Show loading status
+                    
+                    // Find the dialog for this chat
+                    let mut dialogs = tg.client.iter_dialogs();
+                    while let Some(dialog) = dialogs.next().await? {
+                        if dialog.chat().id() == chat_id {
+                            let mut messages_iter = tg.client.iter_messages(dialog.chat());
+                            let mut fetched = 0;
+                            while let Some(msg) = messages_iter.next().await? {
+                                if fetched >= 50 { break; }
+                                let sender = if msg.outgoing() {
+                                    "You".to_string()
+                                } else {
+                                    msg.sender()
+                                        .map(|s| {
+                                            let name = s.name().to_string();
+                                            if name.is_empty() { dialog.chat().name().to_string() } else { name }
+                                        })
+                                        .unwrap_or_else(|| dialog.chat().name().to_string())
+                                };
+                                app.add_message(chat_id, sender, msg.text().to_string(), msg.outgoing());
+                                fetched += 1;
+                            }
+                            
+                            // Reverse messages to show oldest first
+                            if let Some(msgs) = app.messages.get_mut(&chat_id) {
+                                msgs.reverse();
+                            }
+                            break;
+                        }
+                    }
+                    app.loading_status = None;
+                }
+            }
         }
 
         // Handle reload request (r key)

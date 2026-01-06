@@ -43,6 +43,8 @@ pub struct App {
     pub input: String,
     pub should_quit: bool,
     pub reload_requested: bool,
+    pub loading_status: Option<String>,
+    pub needs_message_load: bool,
 }
 
 impl App {
@@ -58,6 +60,8 @@ impl App {
             input: String::new(),
             should_quit: false,
             reload_requested: false,
+            loading_status: None,
+            needs_message_load: true,
         }
     }
 
@@ -90,6 +94,7 @@ impl App {
                     self.selected_chat -= 1;
                     self.clear_current_unread();
                     self.scroll_offset = 0; // Reset scroll when switching chats
+                    self.needs_message_load = true; // Trigger lazy loading
                 }
             }
             Panel::Chats => {
@@ -109,6 +114,7 @@ impl App {
                     self.selected_chat += 1;
                     self.clear_current_unread();
                     self.scroll_offset = 0; // Reset scroll when switching chats
+                    self.needs_message_load = true; // Trigger lazy loading
                 }
             }
             Panel::Chats => {
