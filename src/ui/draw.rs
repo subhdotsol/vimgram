@@ -7,6 +7,64 @@ use ratatui::{
 
 use crate::app::{App, Mode, Panel};
 
+/// Wrap text into lines that fit within max_width
+fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![text.to_string()];
+    }
+    
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    
+    for word in text.split_whitespace() {
+        let word_len = word.chars().count();
+        let current_len = current_line.chars().count();
+        
+        if current_len == 0 {
+            // First word on line
+            if word_len > max_width {
+                // Word too long, split it
+                let mut chars = word.chars();
+                while chars.clone().count() > 0 {
+                    let chunk: String = chars.by_ref().take(max_width).collect();
+                    if chunk.is_empty() { break; }
+                    lines.push(chunk);
+                }
+            } else {
+                current_line = word.to_string();
+            }
+        } else if current_len + 1 + word_len <= max_width {
+            // Word fits on current line
+            current_line.push(' ');
+            current_line.push_str(word);
+        } else {
+            // Word doesn't fit, start new line
+            lines.push(current_line);
+            if word_len > max_width {
+                let mut chars = word.chars();
+                while chars.clone().count() > 0 {
+                    let chunk: String = chars.by_ref().take(max_width).collect();
+                    if chunk.is_empty() { break; }
+                    lines.push(chunk);
+                }
+                current_line = String::new();
+            } else {
+                current_line = word.to_string();
+            }
+        }
+    }
+    
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+    
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    
+    lines
+}
+
 /// Main UI drawing function
 pub fn draw(frame: &mut Frame, app: &App) {
     // Main container with outer border
@@ -88,6 +146,8 @@ fn draw_friends_panel(frame: &mut Frame, app: &App, area: Rect) {
 
 /// Draw the messages/chats panel
 fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
+    use ratatui::text::{Line, Span};
+    
     let is_focused = app.panel == Panel::Chats;
     let border_color = if is_focused {
         Color::Rgb(70, 130, 180)
@@ -95,41 +155,92 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
         Color::Rgb(50, 50, 60)
     };
 
-    // Calculate inner width for right-alignment (account for borders)
-    let inner_width = area.width.saturating_sub(4) as usize;
+    // Max bubble width = 60% of panel width
+    let panel_width = area.width.saturating_sub(4) as usize;
+    let max_bubble_width = (panel_width * 60) / 100;
 
     let messages = app.current_messages();
-    let items: Vec<ListItem> = messages
-        .iter()
-        .map(|msg| {
-            if msg.outgoing {
-                // Outgoing: right-aligned, green
-                let text = format!("You: {}", msg.text);
-                let padding = inner_width.saturating_sub(text.len());
-                let padded = format!("{}{}", " ".repeat(padding), text);
-                ListItem::new(padded).style(Style::default().fg(Color::Rgb(100, 200, 100)))
-            } else {
-                // Incoming: left-aligned with sender name, gray/white
-                let sender_style = Style::default()
-                    .fg(Color::Rgb(130, 180, 230))
-                    .add_modifier(Modifier::BOLD);
-                let msg_style = Style::default().fg(Color::Rgb(220, 220, 220));
+    let mut items: Vec<ListItem> = Vec::new();
+    
+    for msg in messages.iter() {
+        let text = msg.text.trim();
+        
+        // Skip empty messages
+        if text.is_empty() {
+            continue;
+        }
+        
+        // Wrap text into lines that fit the bubble
+        let wrap_width = max_bubble_width.saturating_sub(4);
+        let wrapped_lines = wrap_text(text, wrap_width);
+        
+        if msg.outgoing {
+            // Outgoing: right-aligned green text
+            let style = Style::default().fg(Color::Rgb(100, 200, 100));
+            let prefix_style = Style::default().fg(Color::Rgb(60, 140, 60));
+            
+            for (i, line_text) in wrapped_lines.iter().enumerate() {
+                let prefix = if i == 0 { "▸ " } else { "  " };
+                let content = format!("{}{}", prefix, line_text);
+                let padding = panel_width.saturating_sub(content.chars().count());
                 
-                let line = ratatui::text::Line::from(vec![
-                    ratatui::text::Span::styled(format!("{}: ", msg.sender), sender_style),
-                    ratatui::text::Span::styled(&msg.text, msg_style),
-                ]);
-                ListItem::new(line)
+                items.push(ListItem::new(Line::from(vec![
+                    Span::raw(" ".repeat(padding)),
+                    Span::styled(prefix, prefix_style),
+                    Span::styled(line_text.clone(), style),
+                ])));
             }
-        })
-        .collect();
+            // Blank line after message
+            items.push(ListItem::new(Line::from("")));
+        } else {
+            // Incoming: sender name then message
+            let sender_display: String = msg.sender.chars().take(12).collect();
+            
+            let sender_style = Style::default()
+                .fg(Color::Rgb(100, 180, 255))
+                .add_modifier(Modifier::BOLD);
+            let text_style = Style::default().fg(Color::Rgb(200, 200, 200));
+            
+            // First line: sender + text
+            if let Some(first_line) = wrapped_lines.first() {
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled(format!(" {}: ", sender_display), sender_style),
+                    Span::styled(first_line.clone(), text_style),
+                ])));
+            }
+            
+            // Continuation lines with indent
+            let indent_len = sender_display.chars().count() + 4;
+            for line_text in wrapped_lines.iter().skip(1) {
+                items.push(ListItem::new(Line::from(vec![
+                    Span::raw(" ".repeat(indent_len)),
+                    Span::styled(line_text.clone(), text_style),
+                ])));
+            }
+            // Blank line after message
+            items.push(ListItem::new(Line::from("")));
+        }
+    }
 
-    let list = List::new(items).block(
+    // Get selected chat name for title
+    let title = if let Some(chat) = app.chats.get(app.selected_chat) {
+        format!(" {} ", chat.name)
+    } else {
+        " chats ".to_string()
+    };
+
+    // Apply scroll offset - skip items based on scroll position
+    let visible_height = area.height.saturating_sub(2) as usize;
+    let scroll = app.scroll_offset.min(items.len().saturating_sub(1));
+    let end = (scroll + visible_height).min(items.len());
+    let visible_items: Vec<ListItem> = items.into_iter().skip(scroll).take(end - scroll).collect();
+
+    let list = List::new(visible_items).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .title(" chats "),
+            .title(title),
     );
 
     frame.render_widget(list, area);

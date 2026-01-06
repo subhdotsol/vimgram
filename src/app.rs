@@ -39,6 +39,7 @@ pub struct App {
     pub messages: HashMap<i64, Vec<Message>>,
     pub selected_chat: usize,
     pub selected_message: usize,
+    pub scroll_offset: usize,
     pub input: String,
     pub should_quit: bool,
     pub reload_requested: bool,
@@ -53,6 +54,7 @@ impl App {
             messages: HashMap::new(),
             selected_chat: 0,
             selected_message: 0,
+            scroll_offset: 0,
             input: String::new(),
             should_quit: false,
             reload_requested: false,
@@ -73,17 +75,27 @@ impl App {
         }
     }
 
+    /// Clear unread count for currently selected chat
+    pub fn clear_current_unread(&mut self) {
+        if let Some(chat) = self.chats.get_mut(self.selected_chat) {
+            chat.unread = 0;
+        }
+    }
+
     /// Move selection up in the current panel
     pub fn move_up(&mut self) {
         match self.panel {
             Panel::Friends => {
                 if self.selected_chat > 0 {
                     self.selected_chat -= 1;
+                    self.clear_current_unread();
+                    self.scroll_offset = 0; // Reset scroll when switching chats
                 }
             }
             Panel::Chats => {
-                if self.selected_message > 0 {
-                    self.selected_message -= 1;
+                // Scroll up in the chat
+                if self.scroll_offset > 0 {
+                    self.scroll_offset -= 1;
                 }
             }
         }
@@ -95,13 +107,13 @@ impl App {
             Panel::Friends => {
                 if self.selected_chat < self.chats.len().saturating_sub(1) {
                     self.selected_chat += 1;
+                    self.clear_current_unread();
+                    self.scroll_offset = 0; // Reset scroll when switching chats
                 }
             }
             Panel::Chats => {
-                let msg_count = self.current_messages().len();
-                if self.selected_message < msg_count.saturating_sub(1) {
-                    self.selected_message += 1;
-                }
+                // Scroll down in the chat
+                self.scroll_offset += 1;
             }
         }
     }
