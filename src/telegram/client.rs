@@ -3,17 +3,49 @@ use grammers_session::Session;
 use std::path::PathBuf;
 use directories::ProjectDirs;
 use std::fs;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct Credentials {
+    pub api_id: i32,
+    pub api_hash: String,
+}
+
+fn get_config_dir() -> Option<PathBuf> {
+    ProjectDirs::from("", "", "vimgram").map(|p| p.config_dir().to_path_buf())
+}
 
 fn get_session_path() -> PathBuf {
-    if let Some(proj_dirs) = ProjectDirs::from("", "", "vimgram") {
-        let config_dir = proj_dirs.config_dir();
-        // Ensure directory exists
-        if !config_dir.exists() {
-            let _ = fs::create_dir_all(config_dir);
+    get_config_dir()
+        .map(|d| d.join("session.dat"))
+        .unwrap_or_else(|| PathBuf::from(".bifrost_session"))
+}
+
+fn get_credentials_path() -> PathBuf {
+    get_config_dir()
+        .map(|d| d.join("credentials.json"))
+        .unwrap_or_else(|| PathBuf::from("credentials.json"))
+}
+
+impl Credentials {
+    pub fn load() -> Option<Self> {
+        let path = get_credentials_path();
+        if path.exists() {
+            let file = fs::File::open(path).ok()?;
+            serde_json::from_reader(file).ok()
+        } else {
+            None
         }
-        config_dir.join("session.dat")
-    } else {
-        PathBuf::from(".bifrost_session") // Fallback
+    }
+
+    pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let path = get_credentials_path();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let file = fs::File::create(path)?;
+        serde_json::to_writer_pretty(file, self)?;
+        Ok(())
     }
 }
 

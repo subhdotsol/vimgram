@@ -33,17 +33,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load .env file if present
     dotenvy::dotenv().ok();
 
-    // Get API credentials (from env or prompt)
+    // Get API credentials (priority: Env, then Config File, then Prompt)
     let (api_id, api_hash) = match (
         std::env::var("TELEGRAM_API_ID"),
         std::env::var("TELEGRAM_API_HASH"),
     ) {
         (Ok(id), Ok(hash)) => (id.parse::<i32>().expect("Invalid API_ID"), hash),
         _ => {
-            println!("╔═══════════════════════════════════╗");
-            println!("║         Bifrost v0.1.0            ║");
-            println!("╚═══════════════════════════════════╝");
-            prompt_for_credentials()
+            use telegram::client::Credentials;
+            if let Some(creds) = Credentials::load() {
+                (creds.api_id, creds.api_hash)
+            } else {
+                println!("╔═══════════════════════════════════╗");
+                println!("║         ViMGRAM v0.1.1            ║");
+                println!("╚═══════════════════════════════════╝");
+                let (id, hash) = prompt_for_credentials();
+                
+                // Save for next time
+                let creds = Credentials { api_id: id, api_hash: hash.clone() };
+                if let Err(e) = creds.save() {
+                    eprintln!("Warning: Failed to save credentials: {}", e);
+                }
+                (id, hash)
+            }
         }
     };
 
