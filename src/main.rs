@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let me = tg.client.get_me().await?;
     println!("✅ Logged in as @{}", me.username().unwrap_or("unknown"));
-    println!("🚀 Starting Bifrost...");
+    println!("🚀 Starting Vimgram...");
 
     // Setup terminal
     enable_raw_mode()?;
