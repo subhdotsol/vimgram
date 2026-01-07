@@ -19,6 +19,7 @@ use crossterm::event::EventStream;
 use app::App;
 use telegram::auth::{authenticate, prompt_for_credentials};
 use telegram::client::{TelegramClient, delete_session};
+use telegram::accounts::AccountRegistry;
 use ui::draw::draw;
 use ui::input::handle_key;
 
@@ -36,6 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load .env file if present
     dotenvy::dotenv().ok();
 
+    // Load account registry
+    let mut account_registry = AccountRegistry::load();
+
     // Get API credentials (priority: Env, then Config File, then Prompt)
     let (api_id, api_hash) = match (
         std::env::var("TELEGRAM_API_ID"),
@@ -48,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (creds.api_id, creds.api_hash)
             } else {
                 println!("╔═══════════════════════════════════╗");
-                println!("║         ViMGRAM v0.1.1            ║");
+                println!("║         ViMGRAM v0.2.0            ║");
                 println!("╚═══════════════════════════════════╝");
                 let (id, hash) = prompt_for_credentials();
                 
@@ -62,13 +66,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Connect and authenticate
+    // Connect with account from registry, or use legacy connect
     println!("🔌 Connecting to Telegram...");
-    let tg = TelegramClient::connect(api_id, &api_hash).await?;
+    let tg = if account_registry.has_accounts() {
+        let active_id = account_registry.active.clone();
+        TelegramClient::connect_with_account(api_id, &api_hash, &active_id).await?
+    } else {
+        TelegramClient::connect(api_id, &api_hash).await?
+    };
 
     if !tg.is_authorized().await? {
         authenticate(&tg.client).await?;
         tg.save_session()?;
+        
+        // Update the current account's info in registry
+        let me = tg.client.get_me().await?;
+        let phone = me.phone().unwrap_or("Unknown").to_string();
+        let name = me.first_name().to_string();
+        
+        if account_registry.has_accounts() {
+            // Update existing account's info
+            if let Some(account) = account_registry.accounts.iter_mut().find(|a| a.id == account_registry.active) {
+                account.phone = phone;
+                account.name = name;
+            }
+        } else {
+            // First account - add it
+            let account_id = account_registry.add_account(phone, name);
+            account_registry.set_active(&account_id);
+        }
+        let _ = account_registry.save();
     }
 
     let me = tg.client.get_me().await?;
@@ -85,6 +112,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create app state
     let mut app = App::new();
     app.loading_status = Some("Loading chats...".to_string());
+    
+    // Set account info in app state
+    let account_info: Vec<(String, String)> = account_registry.accounts
+        .iter()
+        .map(|a| (a.id.clone(), format!("{} ({})", a.name, a.phone)))
+        .collect();
+    app.set_account_info(account_registry.active.clone(), account_info);
 
     // Add welcome chat (the keybindings box is rendered by draw_welcome_box in draw.rs)
     app.add_chat(1, "Welcome".to_string());
@@ -275,7 +309,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
                         }
-                        if app.should_quit || app.disconnect_requested {
+                        if app.should_quit || app.disconnect_requested || app.add_account_requested || app.switch_account_requested.is_some() {
                             break;
                         }
                     }
@@ -352,6 +386,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(true) => println!("🔌 Session deleted. Run vimgram again to log in with a new account."),
             Ok(false) => println!("⚠️ No session file found."),
             Err(e) => println!("❌ Failed to delete session: {}", e),
+        }
+    } else if let Some(account_id) = app.switch_account_requested {
+        // Switch to the selected account and auto-restart
+        account_registry.set_active(&account_id);
+        let _ = account_registry.save();
+        println!("🔄 Switching to account: {}...", account_id);
+        
+        // Auto-restart by exec'ing ourselves
+        let exe = std::env::current_exe().expect("Failed to get current executable");
+        let args: Vec<String> = std::env::args().collect();
+        
+        // Use exec to replace current process (Unix-like systems)
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            let mut cmd = std::process::Command::new(&exe);
+            cmd.args(&args[1..]);
+            let err = cmd.exec();
+            eprintln!("Failed to restart: {}", err);
+        }
+        
+        // On non-Unix, just tell user to restart
+        #[cfg(not(unix))]
+        {
+            println!("   Run vimgram again to load the account.");
+        }
+    } else if app.add_account_requested {
+        // Create a new account entry and set it as active (session doesn't exist yet)
+        let new_id = format!("account_{}", account_registry.accounts.len() + 1);
+        account_registry.accounts.push(telegram::accounts::Account {
+            id: new_id.clone(),
+            phone: "New".to_string(),
+            name: "New Account".to_string(),
+        });
+        account_registry.set_active(&new_id);
+        let _ = account_registry.save();
+        
+        // Auto-restart for new account authentication
+        println!("➕ Adding new account...");
+        let exe = std::env::current_exe().expect("Failed to get current executable");
+        let args: Vec<String> = std::env::args().collect();
+        
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            let mut cmd = std::process::Command::new(&exe);
+            cmd.args(&args[1..]);
+            let err = cmd.exec();
+            eprintln!("Failed to restart: {}", err);
+        }
+        
+        #[cfg(not(unix))]
+        {
+            println!("   Run vimgram again to authenticate the new account.");
         }
     } else {
         println!("👋 Goodbye!");

@@ -98,6 +98,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     draw_friends_panel(frame, app, horizontal[0]);
     draw_chats_panel(frame, app, horizontal[1]);
     draw_input_box(frame, app, vertical[1]);
+    
+    // Draw account picker overlay if in that mode
+    if app.mode == Mode::AccountPicker {
+        draw_account_picker(frame, app, frame.area());
+    }
 }
 
 /// Draw the friends/contacts list panel
@@ -420,6 +425,10 @@ fn draw_input_box(frame: &mut Frame, app: &App, area: Rect) {
             " / search (↑↓ navigate, Enter select, Esc cancel) ",
             Style::default().fg(Color::Rgb(255, 180, 50)),
         ),
+        Mode::AccountPicker => (
+            " A switch accounts (↑↓ navigate, Enter select, Esc cancel) ",
+            Style::default().fg(Color::Rgb(150, 100, 255)),
+        ),
         Mode::Normal => (
             " type to send ",
             Style::default().fg(Color::Rgb(80, 80, 90)),
@@ -445,4 +454,65 @@ fn draw_input_box(frame: &mut Frame, app: &App, area: Rect) {
             area.y + 1,
         ));
     }
+}
+
+/// Draw the account picker overlay
+fn draw_account_picker(frame: &mut Frame, app: &App, area: Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::Clear;
+    
+    // Calculate overlay dimensions
+    let box_width = 40.min(area.width.saturating_sub(10));
+    let box_height = (app.account_names.len() as u16 + 4).min(area.height.saturating_sub(6));
+    
+    let box_x = (area.width.saturating_sub(box_width)) / 2;
+    let box_y = (area.height.saturating_sub(box_height)) / 2;
+    
+    let overlay_area = Rect::new(box_x, box_y, box_width, box_height);
+    
+    // Clear the area behind the overlay
+    frame.render_widget(Clear, overlay_area);
+    
+    // Build account list items
+    let mut items: Vec<ListItem> = app.account_names
+        .iter()
+        .enumerate()
+        .map(|(i, (id, name))| {
+            let is_selected = i == app.account_picker_selected;
+            let is_current = *id == app.current_account_id;
+            
+            let prefix = if is_selected { "> " } else { "  " };
+            let suffix = if is_current { " ✓" } else { "" };
+            
+            let style = if is_selected {
+                Style::default().fg(Color::Rgb(150, 100, 255)).add_modifier(Modifier::BOLD)
+            } else if is_current {
+                Style::default().fg(Color::Rgb(100, 200, 100))
+            } else {
+                Style::default().fg(Color::Rgb(180, 180, 180))
+            };
+            
+            ListItem::new(format!("{}{}{}", prefix, name, suffix)).style(style)
+        })
+        .collect();
+    
+    // Add "+ Add Account" option
+    let add_selected = app.account_picker_selected == app.account_names.len();
+    let add_style = if add_selected {
+        Style::default().fg(Color::Rgb(100, 200, 100)).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::Rgb(100, 180, 100))
+    };
+    let add_prefix = if add_selected { "> " } else { "  " };
+    items.push(ListItem::new(format!("{}+ Add Account", add_prefix)).style(add_style));
+    
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(150, 100, 255)))
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .title(" Switch Account "),
+    );
+    
+    frame.render_widget(list, overlay_area);
 }

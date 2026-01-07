@@ -13,6 +13,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<String> {
         Mode::Normal => handle_normal_mode(app, key),
         Mode::Insert => handle_insert_mode(app, key),
         Mode::Search => handle_search_mode(app, key),
+        Mode::AccountPicker => handle_account_picker_mode(app, key),
     }
 }
 
@@ -39,6 +40,9 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Option<String> {
         
         // Disconnect (delete session and quit)
         KeyCode::Char('D') => app.disconnect_requested = true,
+        
+        // Account picker
+        KeyCode::Char('A') => app.enter_account_picker(),
         
         // Jump to top/bottom
         KeyCode::Char('g') => app.selected_chat = 0,
@@ -121,6 +125,32 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Option<String> {
         KeyCode::Char(c) => {
             app.search_input.push(c);
             app.update_search_filter();
+        }
+        
+        _ => {}
+    }
+    None
+}
+
+/// Handle keys in account picker mode
+fn handle_account_picker_mode(app: &mut App, key: KeyEvent) -> Option<String> {
+    match key.code {
+        // Exit account picker
+        KeyCode::Esc => {
+            app.exit_account_picker();
+        }
+        
+        // Select account
+        KeyCode::Enter => {
+            app.select_account();
+        }
+        
+        // Navigate accounts
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.account_picker_move_down();
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.account_picker_move_up();
         }
         
         _ => {}

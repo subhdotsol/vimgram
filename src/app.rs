@@ -6,6 +6,7 @@ pub enum Mode {
     Normal,
     Insert,
     Search,
+    AccountPicker,
 }
 
 /// Which panel is focused
@@ -52,6 +53,12 @@ pub struct App {
     pub search_selected: usize,
     // Disconnect request
     pub disconnect_requested: bool,
+    // Multi-account state
+    pub current_account_id: String,
+    pub account_names: Vec<(String, String)>,  // (id, display_name)
+    pub account_picker_selected: usize,
+    pub switch_account_requested: Option<String>,
+    pub add_account_requested: bool,
 }
 
 impl App {
@@ -75,6 +82,12 @@ impl App {
             search_selected: 0,
             // Disconnect
             disconnect_requested: false,
+            // Multi-account
+            current_account_id: String::new(),
+            account_names: Vec::new(),
+            account_picker_selected: 0,
+            switch_account_requested: None,
+            add_account_requested: false,
         }
     }
 
@@ -239,5 +252,63 @@ impl App {
         if self.search_selected < self.filtered_chat_indices.len().saturating_sub(1) {
             self.search_selected += 1;
         }
+    }
+
+    // ==================== Account Picker Methods ====================
+
+    /// Enter account picker mode
+    pub fn enter_account_picker(&mut self) {
+        self.mode = Mode::AccountPicker;
+        self.account_picker_selected = 0;
+        // Find current account index
+        for (i, (id, _)) in self.account_names.iter().enumerate() {
+            if *id == self.current_account_id {
+                self.account_picker_selected = i;
+                break;
+            }
+        }
+    }
+
+    /// Exit account picker mode
+    pub fn exit_account_picker(&mut self) {
+        self.mode = Mode::Normal;
+    }
+
+    /// Move up in account picker
+    pub fn account_picker_move_up(&mut self) {
+        if self.account_picker_selected > 0 {
+            self.account_picker_selected -= 1;
+        }
+    }
+
+    /// Move down in account picker (includes "+ Add Account" option)
+    pub fn account_picker_move_down(&mut self) {
+        // +1 for the "Add Account" option
+        let max_index = self.account_names.len();
+        if self.account_picker_selected < max_index {
+            self.account_picker_selected += 1;
+        }
+    }
+
+    /// Select the current account in picker
+    pub fn select_account(&mut self) {
+        if self.account_picker_selected < self.account_names.len() {
+            // Switch to selected account
+            let (account_id, _) = &self.account_names[self.account_picker_selected];
+            if *account_id != self.current_account_id {
+                self.switch_account_requested = Some(account_id.clone());
+            }
+            self.exit_account_picker();
+        } else {
+            // "Add Account" selected
+            self.add_account_requested = true;
+            self.exit_account_picker();
+        }
+    }
+
+    /// Set the current account info
+    pub fn set_account_info(&mut self, account_id: String, accounts: Vec<(String, String)>) {
+        self.current_account_id = account_id;
+        self.account_names = accounts;
     }
 }
