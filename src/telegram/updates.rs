@@ -15,7 +15,7 @@ pub async fn listen_for_updates(client: &Client) -> Result<(), Box<dyn std::erro
                 let sender = message.sender();
                 let sender_name = match &sender {
                     Some(chat) => chat.name().to_string(),
-                    None => "Unknown".to_string(),
+                    None => String::new(),
                 };
 
                 // Get chat name (for groups/channels)

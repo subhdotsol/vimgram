@@ -1,6 +1,6 @@
 [package]
 name = "vimgram"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 authors = ["Subh <subhajitchaudhury05@gmail.com>"]
 description = "A blazing fast, Vim-native Telegram client for the terminal. Built with Rust, Ratatui, and Grammers."

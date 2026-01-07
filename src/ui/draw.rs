@@ -194,9 +194,10 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
             items.push(ListItem::new(Line::from("")));
         } else {
             // Incoming: sender name then message
-            let mut sender_display: String = msg.sender.chars().take(20).collect();
+            let sender_display: String = msg.sender.chars().take(20).collect();
             if sender_display.trim().is_empty() {
-                sender_display = "Unknown".to_string();
+                // Don't force "Unknown", just leave it empty
+                // sender_display = "Unknown".to_string(); 
             }
             
             let sender_style = Style::default()
@@ -214,7 +215,13 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
             }
 
             if let Some(first_line) = wrapped_lines.first() {
-                if sender_display == current_chat_name && current_chat_name != "Unknown" {
+                // Hide if explicitly "Unknown", empty, or matches chat title (DM)
+                let should_hide_name = 
+                    sender_display == "Unknown" || 
+                    sender_display.trim().is_empty() ||
+                    (sender_display == current_chat_name && current_chat_name != "Unknown");
+
+                if should_hide_name {
                     // Hide sender name, just show text (padded to align with other lines if desirable, 
                     // or just flush left. Standard TUI chat usually aligns flush left if no name).
                     items.push(ListItem::new(Line::from(vec![
@@ -234,8 +241,13 @@ fn draw_chats_panel(frame: &mut Frame, app: &App, area: Rect) {
                 }
             }
             
-            // Continuation lines with indent
-            let indent_len = if sender_display == current_chat_name && current_chat_name != "Unknown" {
+// Continuation lines with indent
+            let should_hide_name = 
+                sender_display == "Unknown" || 
+                sender_display.trim().is_empty() ||
+                (sender_display == current_chat_name && current_chat_name != "Unknown");
+
+            let indent_len = if should_hide_name {
                 2 // Just the left padding
             } else {
                 sender_display.chars().count() + 4 + 2 // Name + ": " + left padding

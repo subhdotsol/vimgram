@@ -222,14 +222,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             let name = s.name().to_string();
                                             if name.trim().is_empty() {
                                                 let cname = dialog.chat().name().to_string();
-                                                if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
+                                                if cname.trim().is_empty() { String::new() } else { cname }
                                             } else {
                                                 name
                                             }
                                         })
                                         .unwrap_or_else(|| {
                                             let cname = dialog.chat().name().to_string();
-                                            if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
+                                            if cname.trim().is_empty() { String::new() } else { cname }
                                         })
                                 };
                                 app.add_message(
@@ -301,16 +301,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let name = s.name().to_string();
                                 if name.trim().is_empty() { 
                                     let cname = chat.name().to_string();
-                                    if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
+                                    if cname.trim().is_empty() { String::new() } else { cname }
                                 } else { name }
                             })
                             .unwrap_or_else(|| {
                                 let cname = chat.name().to_string();
-                                if cname.trim().is_empty() { "Unknown".to_string() } else { cname }
+                                if cname.trim().is_empty() { String::new() } else { cname }
                             });
 
                         // If sender is still Unknown, try to refresh via dialogs
-                        if sender_name == "Unknown" {
+                        if sender_name == "Unknown" || sender_name.trim().is_empty() {
                             // If it's a DM (positive ID), the chat name IS the sender name.
                             // Trust the chat name over "Unknown"
                             let mut resolved_name = chat.name().to_string();
