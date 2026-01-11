@@ -96,8 +96,16 @@ Vimgram is modal, just like Vim.
 | `j` / `k` | Scroll history **down** (newer) / **up** (older) |
 | `h` / `l` | Switch focus between **Friends List** and **Chat** |
 | `/` | Enter **SEARCH** mode (filter friends list) |
+| `:` | Enter **COMMAND** mode |
 | `i` | Enter **INSERT** mode (start typing) |
 | `q` | Quit Vimgram |
+
+### **COMMAND Mode**
+| Key | Action |
+|:---:|---|
+| `:find @user` | Search for **any** Telegram user by username |
+| `:q` | Quit Vimgram |
+| `Esc` | Cancel, return to **NORMAL** |
 
 ### **SEARCH Mode**
 | Key | Action |

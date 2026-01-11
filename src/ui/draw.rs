@@ -103,6 +103,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     if app.mode == Mode::AccountPicker {
         draw_account_picker(frame, app, frame.area());
     }
+    
+    // Draw find user overlay if in that mode
+    if app.mode == Mode::FindUser {
+        draw_find_user(frame, app, frame.area());
+    }
 }
 
 /// Draw the friends/contacts list panel
@@ -368,7 +373,7 @@ fn draw_welcome_box(frame: &mut Frame, area: Rect, border_color: Color) {
     
     // Calculate centered box dimensions - ensure minimum viable size
     let content_width = 50;
-    let content_height = 15;  // 12 lines + 2 for borders + 1 buffer
+    let content_height = 18;  // 15 lines + 2 for borders + 1 buffer
     
     let box_width = content_width.min(inner_area.width.saturating_sub(2));
     let box_height = content_height.min(inner_area.height.saturating_sub(2));
@@ -392,8 +397,11 @@ fn draw_welcome_box(frame: &mut Frame, area: Rect, border_color: Color) {
         )),
         Line::from(""),
         Line::from(Span::styled("NORMAL MODE", Style::default().fg(Color::Rgb(255, 180, 50)).add_modifier(Modifier::BOLD))),
-        Line::from(Span::styled("j/k scroll  h/l panels  / search", Style::default().fg(Color::Rgb(180, 180, 180)))),
+        Line::from(Span::styled("j/k scroll  h/l panels  / search  : cmd", Style::default().fg(Color::Rgb(180, 180, 180)))),
         Line::from(Span::styled("i insert  q quit  D disconnect", Style::default().fg(Color::Rgb(180, 180, 180)))),
+        Line::from(""),
+        Line::from(Span::styled("COMMAND MODE", Style::default().fg(Color::Rgb(100, 200, 100)).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(":find @user  search any Telegram user", Style::default().fg(Color::Rgb(180, 180, 180)))),
         Line::from(""),
         Line::from(Span::styled("SEARCH MODE", Style::default().fg(Color::Rgb(255, 180, 50)).add_modifier(Modifier::BOLD))),
         Line::from(Span::styled("type filter  arrows nav  Enter jump", Style::default().fg(Color::Rgb(180, 180, 180)))),
@@ -429,13 +437,27 @@ fn draw_input_box(frame: &mut Frame, app: &App, area: Rect) {
             " A switch accounts (↑↓ navigate, Enter select, Esc cancel) ",
             Style::default().fg(Color::Rgb(150, 100, 255)),
         ),
+        Mode::Command => (
+            " COMMAND ",
+            Style::default().fg(Color::Rgb(100, 200, 100)),
+        ),
+        Mode::FindUser => (
+            " FIND USER ",
+            Style::default().fg(Color::Rgb(100, 200, 255)),
+        ),
         Mode::Normal => (
             " type to send ",
             Style::default().fg(Color::Rgb(80, 80, 90)),
         ),
     };
 
-    let input = Paragraph::new(app.input.as_str())
+    // Content to display in input box
+    let content = match app.mode {
+        Mode::Command => format!(":{}", app.command_input),
+        _ => app.input.clone(),
+    };
+
+    let input = Paragraph::new(content.as_str())
         .style(Style::default().fg(Color::White))
         .block(
             Block::default()
@@ -447,10 +469,16 @@ fn draw_input_box(frame: &mut Frame, app: &App, area: Rect) {
 
     frame.render_widget(input, area);
 
-    // Show cursor in insert mode
+    // Show cursor in insert mode or command mode
     if app.mode == Mode::Insert {
         frame.set_cursor_position((
             area.x + app.input.len() as u16 + 1,
+            area.y + 1,
+        ));
+    } else if app.mode == Mode::Command {
+        // +2 for ": " prefix
+        frame.set_cursor_position((
+            area.x + app.command_input.len() as u16 + 2,
             area.y + 1,
         ));
     }
@@ -515,4 +543,85 @@ fn draw_account_picker(frame: &mut Frame, app: &App, area: Rect) {
     );
     
     frame.render_widget(list, overlay_area);
+}
+
+/// Draw the find user overlay
+fn draw_find_user(frame: &mut Frame, app: &App, area: Rect) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::Clear;
+    use crate::app::FindResult;
+    
+    // Calculate overlay dimensions
+    let box_width = 50.min(area.width.saturating_sub(10));
+    let box_height = 7.min(area.height.saturating_sub(6));
+    
+    let box_x = (area.width.saturating_sub(box_width)) / 2;
+    let box_y = (area.height.saturating_sub(box_height)) / 2;
+    
+    let overlay_area = Rect::new(box_x, box_y, box_width, box_height);
+    
+    // Clear the area behind the overlay
+    frame.render_widget(Clear, overlay_area);
+    
+    // Build content based on find result
+    let lines: Vec<Line> = match &app.find_result {
+        Some(FindResult::Searching) => vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                format!("🔍 Searching for @{}...", app.find_input),
+                Style::default().fg(Color::Rgb(100, 200, 255)),
+            )),
+        ],
+        Some(FindResult::Found { name, .. }) => vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                format!("✅ Found: {}", name),
+                Style::default().fg(Color::Rgb(100, 200, 100)).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::styled(
+                "Press Enter to start chatting, Esc to cancel",
+                Style::default().fg(Color::Rgb(180, 180, 180)),
+            )),
+        ],
+        Some(FindResult::NotFound(username)) => vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                format!("❌ User @{} not found", username),
+                Style::default().fg(Color::Rgb(255, 100, 100)),
+            )),
+            Line::from(Span::styled(
+                "Press Esc to close",
+                Style::default().fg(Color::Rgb(180, 180, 180)),
+            )),
+        ],
+        Some(FindResult::Error(msg)) => vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                format!("⚠️ Error: {}", msg),
+                Style::default().fg(Color::Rgb(255, 180, 50)),
+            )),
+            Line::from(Span::styled(
+                "Press Esc to close",
+                Style::default().fg(Color::Rgb(180, 180, 180)),
+            )),
+        ],
+        None => vec![
+            Line::from(Span::styled(
+                "Type a username to search...",
+                Style::default().fg(Color::Rgb(180, 180, 180)),
+            )),
+        ],
+    };
+    
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Rgb(100, 200, 255)))
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .title(format!(" :find @{} ", app.find_input));
+    
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .alignment(ratatui::layout::Alignment::Center);
+    
+    frame.render_widget(paragraph, overlay_area);
 }

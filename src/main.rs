@@ -6,6 +6,7 @@ use std::io;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crossterm::{
     event::{self, Event},
@@ -18,7 +19,7 @@ use futures::{FutureExt, StreamExt};
 use tokio::sync::mpsc;
 use crossterm::event::EventStream;
 
-use app::App;
+use app::{App, FindResult};
 use telegram::auth::{authenticate, prompt_for_credentials};
 use telegram::client::{TelegramClient, delete_session};
 use telegram::accounts::AccountRegistry;
@@ -141,8 +142,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         app.add_chat(chat.id(), chat.name().to_string());
         count += 1;
     }
-    // Wrap in Arc for sharing with async tasks
-    let chat_cache = Arc::new(chat_cache);
+    // Wrap in Arc<RwLock> for sharing with async tasks (allows mutable updates for new users)
+    let chat_cache = Arc::new(RwLock::new(chat_cache));
 
     app.loading_status = None;
     // Let lazy loading handle message fetching for the first chat too
@@ -173,6 +174,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a channel for loaded messages (chat_id, messages)
     type LoadedMessages = (i64, Vec<(String, String, bool)>);
     let (msg_tx, mut msg_rx) = mpsc::unbounded_channel::<LoadedMessages>();
+
+    // Create a channel for find user results
+    type FindUserResult = (String, Result<(i64, String, grammers_client::types::Chat), String>);
+    let (find_tx, mut find_rx) = mpsc::unbounded_channel::<FindUserResult>();
 
     // Main loop
     let mut reader = EventStream::new();
@@ -251,9 +256,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let cache = chat_cache.clone();
                         tokio::spawn(async move {
                             // Use cached chat directly - no dialog iteration!
-                            if let Some(cached_chat) = cache.get(&chat_id) {
+                            let cache_read = cache.read().await;
+                            if let Some(cached_chat) = cache_read.get(&chat_id) {
                                 let chat_name = cached_chat.name().to_string();
-                                let mut messages_iter = client.iter_messages(cached_chat);
+                                let cached_chat = cached_chat.clone();
+                                drop(cache_read); // Release lock before async iteration
+                                let mut messages_iter = client.iter_messages(&cached_chat);
                                 let mut loaded_msgs: Vec<(String, String, bool)> = Vec::new();
                                 let mut fetched = 0;
                                 while let Ok(Some(msg)) = messages_iter.next().await {
@@ -293,6 +301,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        // Handle find user request
+        if let Some(username) = app.find_requested.take() {
+            let client = tg.client.clone();
+            let find_tx_clone = find_tx.clone();
+            let username_clone = username.clone();
+            tokio::spawn(async move {
+                match client.resolve_username(&username_clone).await {
+                    Ok(Some(chat)) => {
+                        let id = chat.id();
+                        let name = chat.name().to_string();
+                        let _ = find_tx_clone.send((username_clone, Ok((id, name, chat))));
+                    }
+                    Ok(None) => {
+                        let _ = find_tx_clone.send((username_clone.clone(), Err(format!("User @{} not found", username_clone))));
+                    }
+                    Err(e) => {
+                        let _ = find_tx_clone.send((username_clone, Err(format!("Error: {}", e))));
+                    }
+                }
+            });
+        }
+
         tokio::select! {
             // Handle Keyboard Input
             maybe_event = reader.next().fuse() => {
@@ -301,9 +331,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                          if let Some(message_to_send) = handle_key(&mut app, key) {
                             // Send message to current chat using cached chat (O(1) lookup!)
                             if let Some(chat_id) = app.current_chat_id() {
-                                if let Some(cached_chat) = chat_cache.get(&chat_id) {
+                                let cache_read = chat_cache.read().await;
+                                if let Some(cached_chat) = cache_read.get(&chat_id) {
+                                    let cached_chat = cached_chat.clone();
+                                    drop(cache_read); // Release lock before async operation
                                     tg.client
-                                        .send_message(cached_chat, message_to_send.clone())
+                                        .send_message(&cached_chat, message_to_send.clone())
                                         .await?;
                                     app.add_message(
                                         chat_id,
@@ -389,6 +422,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     app.pending_load = None;
                 }
                 // If user navigated away, just ignore the loaded messages
+            }
+
+            // Handle find user results
+            Some((username, result)) = find_rx.recv() => {
+                match result {
+                    Ok((id, name, chat)) => {
+                        // Add the user to the chat list and cache
+                        app.add_chat(id, name.clone());
+                        chat_cache.write().await.insert(id, chat);
+                        app.set_find_result(FindResult::Found { id, name });
+                    }
+                    Err(msg) => {
+                        if msg.contains("not found") {
+                            app.set_find_result(FindResult::NotFound(username));
+                        } else {
+                            app.set_find_result(FindResult::Error(msg));
+                        }
+                    }
+                }
             }
         }
     }

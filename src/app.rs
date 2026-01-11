@@ -7,6 +7,8 @@ pub enum Mode {
     Insert,
     Search,
     AccountPicker,
+    Command,   // For : commands
+    FindUser,  // For :find username
 }
 
 /// Which panel is focused
@@ -61,6 +63,21 @@ pub struct App {
     pub add_account_requested: bool,
     // Async loading state
     pub pending_load: Option<i64>,
+    // Command mode state
+    pub command_input: String,
+    // Find User mode state
+    pub find_input: String,
+    pub find_result: Option<FindResult>,
+    pub find_requested: Option<String>, // Username to resolve
+}
+
+/// Result of a global user search
+#[derive(Debug, Clone)]
+pub enum FindResult {
+    Searching,
+    Found { id: i64, name: String },
+    NotFound(String),
+    Error(String),
 }
 
 impl App {
@@ -92,6 +109,12 @@ impl App {
             add_account_requested: false,
             // Async loading
             pending_load: None,
+            // Command mode
+            command_input: String::new(),
+            // Find User mode
+            find_input: String::new(),
+            find_result: None,
+            find_requested: None,
         }
     }
 
@@ -314,5 +337,67 @@ impl App {
     pub fn set_account_info(&mut self, account_id: String, accounts: Vec<(String, String)>) {
         self.current_account_id = account_id;
         self.account_names = accounts;
+    }
+
+    // ==================== Command Mode Methods ====================
+
+    /// Enter command mode (after pressing :)
+    pub fn enter_command(&mut self) {
+        self.mode = Mode::Command;
+        self.command_input.clear();
+    }
+
+    /// Exit command mode
+    pub fn exit_command(&mut self) {
+        self.mode = Mode::Normal;
+        self.command_input.clear();
+    }
+
+    /// Execute the current command
+    pub fn execute_command(&mut self) {
+        let cmd = self.command_input.trim().to_lowercase();
+        if cmd.starts_with("find ") || cmd.starts_with("f ") {
+            // Extract username (strip leading @ if present)
+            let username = cmd.split_whitespace().nth(1).unwrap_or("").trim_start_matches('@');
+            if !username.is_empty() {
+                self.find_input = username.to_string();
+                self.find_result = Some(FindResult::Searching);
+                self.find_requested = Some(username.to_string());
+                self.mode = Mode::FindUser;
+            }
+        } else if cmd == "q" || cmd == "quit" {
+            self.should_quit = true;
+        }
+        // Clear command input after execution
+        self.command_input.clear();
+    }
+
+    // ==================== FindUser Mode Methods ====================
+
+    /// Exit find user mode
+    pub fn exit_find(&mut self) {
+        self.mode = Mode::Normal;
+        self.find_input.clear();
+        self.find_result = None;
+        self.find_requested = None;
+    }
+
+    /// Set find result after username resolution
+    pub fn set_find_result(&mut self, result: FindResult) {
+        self.find_result = Some(result);
+    }
+
+    /// Navigate to the found user and start chatting
+    pub fn jump_to_found_user(&mut self) {
+        if let Some(FindResult::Found { id, .. }) = &self.find_result {
+            // Find the chat in our list and navigate to it
+            if let Some(index) = self.chats.iter().position(|c| c.id == *id) {
+                self.selected_chat = index;
+                self.scroll_offset = 0;
+                self.needs_message_load = true;
+                self.clear_current_unread();
+            }
+        }
+        self.exit_find();
     }
 }

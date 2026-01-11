@@ -14,6 +14,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<String> {
         Mode::Insert => handle_insert_mode(app, key),
         Mode::Search => handle_search_mode(app, key),
         Mode::AccountPicker => handle_account_picker_mode(app, key),
+        Mode::Command => handle_command_mode(app, key),
+        Mode::FindUser => handle_find_user_mode(app, key),
     }
 }
 
@@ -43,6 +45,9 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Option<String> {
         
         // Account picker
         KeyCode::Char('A') => app.enter_account_picker(),
+        
+        // Command mode
+        KeyCode::Char(':') => app.enter_command(),
         
         // Jump to top/bottom
         KeyCode::Char('g') => app.selected_chat = 0,
@@ -151,6 +156,63 @@ fn handle_account_picker_mode(app: &mut App, key: KeyEvent) -> Option<String> {
         }
         KeyCode::Up | KeyCode::Char('k') => {
             app.account_picker_move_up();
+        }
+        
+        _ => {}
+    }
+    None
+}
+
+/// Handle keys in command mode (: commands)
+fn handle_command_mode(app: &mut App, key: KeyEvent) -> Option<String> {
+    match key.code {
+        // Exit command mode
+        KeyCode::Esc => {
+            app.exit_command();
+        }
+        
+        // Execute command
+        KeyCode::Enter => {
+            app.execute_command();
+        }
+        
+        // Delete character
+        KeyCode::Backspace => {
+            if app.command_input.is_empty() {
+                app.exit_command();
+            } else {
+                app.command_input.pop();
+            }
+        }
+        
+        // Type character
+        KeyCode::Char(c) => {
+            app.command_input.push(c);
+        }
+        
+        _ => {}
+    }
+    None
+}
+
+/// Handle keys in find user mode (searching for user)
+fn handle_find_user_mode(app: &mut App, key: KeyEvent) -> Option<String> {
+    use crate::app::FindResult;
+    
+    match key.code {
+        // Exit find mode
+        KeyCode::Esc => {
+            app.exit_find();
+        }
+        
+        // Jump to found user if successful
+        KeyCode::Enter => {
+            if let Some(FindResult::Found { .. }) = &app.find_result {
+                app.jump_to_found_user();
+            } else {
+                // If not found or error, just exit
+                app.exit_find();
+            }
         }
         
         _ => {}
