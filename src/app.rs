@@ -7,8 +7,8 @@ pub enum Mode {
     Insert,
     Search,
     AccountPicker,
-    Command,   // For : commands
-    FindUser,  // For :find username
+    Command,  // For : commands
+    FindUser, // For :find username
 }
 
 /// Which panel is focused
@@ -57,7 +57,7 @@ pub struct App {
     pub disconnect_requested: bool,
     // Multi-account state
     pub current_account_id: String,
-    pub account_names: Vec<(String, String)>,  // (id, display_name)
+    pub account_names: Vec<(String, String)>, // (id, display_name)
     pub account_picker_selected: usize,
     pub switch_account_requested: Option<String>,
     pub add_account_requested: bool,
@@ -126,7 +126,10 @@ impl App {
     /// Get messages for currently selected chat
     pub fn current_messages(&self) -> Vec<&Message> {
         if let Some(id) = self.current_chat_id() {
-            self.messages.get(&id).map(|m| m.iter().collect()).unwrap_or_default()
+            self.messages
+                .get(&id)
+                .map(|m| m.iter().collect())
+                .unwrap_or_default()
         } else {
             Vec::new()
         }
@@ -208,8 +211,12 @@ impl App {
     /// Add a message to a chat
     pub fn add_message(&mut self, chat_id: i64, sender: String, text: String, outgoing: bool) {
         let messages = self.messages.entry(chat_id).or_insert_with(Vec::new);
-        messages.push(Message { sender, text: text.clone(), outgoing });
-        
+        messages.push(Message {
+            sender,
+            text: text.clone(),
+            outgoing,
+        });
+
         // Update last message preview
         if let Some(chat) = self.chats.iter_mut().find(|c| c.id == chat_id) {
             chat.last_message = Some(text);
@@ -237,7 +244,8 @@ impl App {
     /// Update filtered chat indices based on search input
     pub fn update_search_filter(&mut self) {
         let query = self.search_input.to_lowercase();
-        self.filtered_chat_indices = self.chats
+        self.filtered_chat_indices = self
+            .chats
             .iter()
             .enumerate()
             .filter(|(_, chat)| {
@@ -249,7 +257,7 @@ impl App {
             })
             .map(|(i, _)| i)
             .collect();
-        
+
         // Reset selection if it's out of bounds
         if self.search_selected >= self.filtered_chat_indices.len() {
             self.search_selected = 0;
@@ -358,7 +366,11 @@ impl App {
         let cmd = self.command_input.trim().to_lowercase();
         if cmd.starts_with("find ") || cmd.starts_with("f ") {
             // Extract username (strip leading @ if present)
-            let username = cmd.split_whitespace().nth(1).unwrap_or("").trim_start_matches('@');
+            let username = cmd
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or("")
+                .trim_start_matches('@');
             if !username.is_empty() {
                 self.find_input = username.to_string();
                 self.find_result = Some(FindResult::Searching);
