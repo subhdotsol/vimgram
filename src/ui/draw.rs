@@ -7,7 +7,6 @@ use ratatui::{
 
 use crate::app::{App, Mode, Panel};
 
-/// Wrap text into lines that fit within max_width
 fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![text.to_string()];
@@ -16,50 +15,50 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current_line = String::new();
 
-    for word in text.split_whitespace() {
-        let word_len = word.chars().count();
-        let current_len = current_line.chars().count();
+    for line in text.split('\n') {   // <-- split on \n first
+        for word in line.split_whitespace() {
+            let word_len = word.chars().count();
+            let current_len = current_line.chars().count();
 
-        if current_len == 0 {
-            // First word on line
-            if word_len > max_width {
-                // Word too long, split it
-                let mut chars = word.chars();
-                while chars.clone().count() > 0 {
-                    let chunk: String = chars.by_ref().take(max_width).collect();
-                    if chunk.is_empty() {
-                        break;
+            if current_len == 0 {
+                if word_len > max_width {
+                    let mut chars = word.chars();
+                    while chars.clone().count() > 0 {
+                        let chunk: String = chars.by_ref().take(max_width).collect();
+                        if chunk.is_empty() { break; }
+                        lines.push(chunk);
                     }
-                    lines.push(chunk);
+                } else {
+                    current_line = word.to_string();
                 }
+            } else if current_len + 1 + word_len <= max_width {
+                current_line.push(' ');
+                current_line.push_str(word);
             } else {
-                current_line = word.to_string();
-            }
-        } else if current_len + 1 + word_len <= max_width {
-            // Word fits on current line
-            current_line.push(' ');
-            current_line.push_str(word);
-        } else {
-            // Word doesn't fit, start new line
-            lines.push(current_line);
-            if word_len > max_width {
-                let mut chars = word.chars();
-                while chars.clone().count() > 0 {
-                    let chunk: String = chars.by_ref().take(max_width).collect();
-                    if chunk.is_empty() {
-                        break;
+                lines.push(current_line);
+                if word_len > max_width {
+                    let mut chars = word.chars();
+                    while chars.clone().count() > 0 {
+                        let chunk: String = chars.by_ref().take(max_width).collect();
+                        if chunk.is_empty() { break; }
+                        lines.push(chunk);
                     }
-                    lines.push(chunk);
+                    current_line = String::new();
+                } else {
+                    current_line = word.to_string();
                 }
-                current_line = String::new();
-            } else {
-                current_line = word.to_string();
             }
         }
-    }
 
-    if !current_line.is_empty() {
-        lines.push(current_line);
+        // Empty line for explicit \n
+        if current_line.is_empty() {
+            if !lines.is_empty() {
+                lines.push(String::new());
+            }
+        } else {
+            lines.push(current_line);
+        }
+        current_line = String::new();
     }
 
     if lines.is_empty() {
@@ -68,6 +67,7 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
 
     lines
 }
+
 
 /// Main UI drawing function
 pub fn draw(frame: &mut Frame, app: &App) {
